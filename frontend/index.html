@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Research Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0f0f1a;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            padding: 24px;
+            text-align: center;
+            border-bottom: 1px solid #2a2a4a;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            color: #7c6af5;
+            margin-bottom: 6px;
+        }
+
+        .header p { color: #888; font-size: 14px; }
+
+        .container {
+            max-width: 860px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            background: #1a1a2e;
+            border: 1px solid #2a2a4a;
+            border-radius: 12px;
+            padding: 28px;
+            margin-bottom: 24px;
+        }
+
+        .card h2 {
+            font-size: 16px;
+            color: #7c6af5;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 12px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 16px;
+            background: #0f0f1a;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 15px;
+            outline: none;
+        }
+
+        input[type="text"]:focus { border-color: #7c6af5; }
+
+        button {
+            padding: 12px 24px;
+            background: #7c6af5;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        button:hover { background: #6a58e0; }
+        button:disabled { background: #444; cursor: not-allowed; }
+
+        .status {
+            margin-top: 16px;
+            padding: 12px 16px;
+            background: #0f0f1a;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #888;
+            display: none;
+        }
+
+        .summary-box {
+            margin-top: 16px;
+            padding: 16px;
+            background: #0f0f1a;
+            border-left: 3px solid #7c6af5;
+            border-radius: 4px;
+            font-size: 14px;
+            line-height: 1.7;
+            display: none;
+        }
+
+        .sources-list {
+            margin-top: 16px;
+            display: none;
+        }
+
+        .source-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            background: #0f0f1a;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .source-dot {
+            width: 8px;
+            height: 8px;
+            background: #7c6af5;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .source-item a {
+            color: #7c6af5;
+            text-decoration: none;
+        }
+
+        .source-item a:hover { text-decoration: underline; }
+
+        .qa-section { display: none; }
+
+        .answer-box {
+            margin-top: 16px;
+            padding: 18px;
+            background: #0f0f1a;
+            border-left: 3px solid #4caf8a;
+            border-radius: 4px;
+            font-size: 14px;
+            line-height: 1.8;
+            display: none;
+            white-space: pre-wrap;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #444;
+            border-top-color: #7c6af5;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🔬 AI Research Assistant</h1>
+    <p>Search any topic and ask questions about what was found</p>
+</div>
+
+<div class="container">
+
+    <div class="card">
+        <h2>Step 1 — Research a Topic</h2>
+        <div class="input-row">
+            <input type="text" id="topicInput"
+                placeholder="e.g. machine learning trends 2024" />
+            <button onclick="researchTopic()" id="researchBtn">
+                Research
+            </button>
+        </div>
+        <div class="status" id="researchStatus"></div>
+        <div class="summary-box" id="summaryBox"></div>
+        <div class="sources-list" id="sourcesList"></div>
+    </div>
+
+    <div class="card qa-section" id="qaSection">
+        <h2>Step 2 — Ask Questions</h2>
+        <div class="input-row">
+            <input type="text" id="questionInput"
+                placeholder="Ask anything about the research..." />
+            <button onclick="askQuestion()" id="askBtn">
+                Ask
+            </button>
+        </div>
+        <div class="status" id="questionStatus"></div>
+        <div class="answer-box" id="answerBox"></div>
+    </div>
+
+</div>
+
+<script>
+    let currentCollection = null;
+
+    async function researchTopic() {
+        const topic = document.getElementById("topicInput").value.trim();
+        if (!topic) return;
+
+        const btn = document.getElementById("researchBtn");
+        const status = document.getElementById("researchStatus");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading"></span>Researching...';
+        status.style.display = "block";
+        status.innerHTML = '<span class="loading"></span>Searching the web...';
+
+        document.getElementById("summaryBox").style.display = "none";
+        document.getElementById("sourcesList").style.display = "none";
+        document.getElementById("qaSection").style.display = "none";
+
+        try {
+            const response = await fetch("http://localhost:8000/research", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ topic: topic })
+            });
+
+            const data = await response.json();
+            currentCollection = data.collection_name;
+
+            const summaryBox = document.getElementById("summaryBox");
+            summaryBox.innerHTML =
+                `<strong>Summary:</strong><br><br>${data.summary}`;
+            summaryBox.style.display = "block";
+
+            const sourcesList = document.getElementById("sourcesList");
+            sourcesList.innerHTML =
+                `<strong style="font-size:13px;color:#888;">
+                SOURCES FOUND (${data.total_sources})
+                </strong><br><br>`;
+
+            data.sources.forEach(source => {
+                sourcesList.innerHTML += `
+                    <div class="source-item">
+                        <div class="source-dot"></div>
+                        <div>
+                            <div style="color:#ccc">${source.title}</div>
+                            <a href="${source.url}"
+                               target="_blank">${source.url}</a>
+                        </div>
+                    </div>`;
+            });
+
+            sourcesList.style.display = "block";
+            document.getElementById("qaSection").style.display = "block";
+
+            status.innerHTML = `✅ Research complete! Found
+                ${data.total_sources} sources.
+                Now ask your questions below.`;
+
+        } catch (error) {
+            status.innerHTML = "❌ Error: " + error.message;
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = "Research";
+    }
+
+    async function askQuestion() {
+        const question =
+            document.getElementById("questionInput").value.trim();
+        if (!question || !currentCollection) return;
+
+        const btn = document.getElementById("askBtn");
+        const status = document.getElementById("questionStatus");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading"></span>Thinking...';
+        status.style.display = "block";
+        status.innerHTML =
+            '<span class="loading"></span>Finding relevant content...';
+
+        try {
+            const response = await fetch("http://localhost:8000/ask", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    question: question,
+                    collection_name: currentCollection
+                })
+            });
+
+            const data = await response.json();
+
+            const answerBox = document.getElementById("answerBox");
+            answerBox.textContent = data.answer;
+            answerBox.style.display = "block";
+
+            status.innerHTML = `✅ Answer generated using
+                ${data.chunks_used} relevant sources.`;
+
+        } catch (error) {
+            status.innerHTML = "❌ Error: " + error.message;
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = "Ask";
+    }
+
+    document.getElementById("topicInput")
+        .addEventListener("keypress", e => {
+            if (e.key === "Enter") researchTopic();
+        });
+
+    document.getElementById("questionInput")
+        .addEventListener("keypress", e => {
+            if (e.key === "Enter") askQuestion();
+        });
+</script>
+
+</body>
+</html>
